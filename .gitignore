@@ -16,12 +16,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# public
-/public
-
 # dist
 dist/
-
 
 
 # env files
