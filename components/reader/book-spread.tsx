@@ -4,15 +4,17 @@ import { motion, AnimatePresence } from "framer-motion"
 import { type Book, type ReaderSettings } from "@/lib/types"
 import { PdfPage } from "./pdf-page"
 import { useState, useEffect } from "react"
+import { type GestureState } from "@/hooks/use-gesture-handler"
 
 interface BookSpreadProps {
     currentPage: number
     direction: number
     book: Book
     settings: ReaderSettings
+    zoomState?: GestureState
 }
 
-export function BookSpread({ currentPage, direction, book, settings }: BookSpreadProps) {
+export function BookSpread({ currentPage, direction, book, settings, zoomState }: BookSpreadProps) {
     const [pdfFailed, setPdfFailed] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
 
@@ -174,10 +176,22 @@ export function BookSpread({ currentPage, direction, book, settings }: BookSprea
         }),
     }
 
+    // Calculate zoom transform styles
+    const zoomTransform = zoomState && zoomState.scale > 1
+        ? {
+            transform: `scale(${zoomState.scale}) translate(${zoomState.translateX / zoomState.scale}px, ${zoomState.translateY / zoomState.scale}px)`,
+            transition: zoomState.isPinching ? 'none' : 'transform 0.2s ease-out',
+        }
+        : {}
+
     return (
         <div
             className={`relative flex w-full max-w-5xl bg-transparent shadow-2xl transition-all duration-500 rounded-sm ${isMobile ? 'aspect-[2/3]' : 'aspect-[3/2]'}`}
-            style={{ filter: `brightness(${settings.brightness}%)` }}
+            style={{
+                filter: `brightness(${settings.brightness}%)`,
+                ...zoomTransform,
+                transformOrigin: 'center center',
+            }}
         >
             {/* Spine Shadow - hidden on mobile */}
             {!isMobile && (

@@ -12,6 +12,8 @@ import {
   Plus,
   Star,
   Settings,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react"
 import { useState, useCallback, useEffect, useRef } from "react"
 import { type Book, type ReaderSettings } from "@/lib/types"
@@ -20,6 +22,7 @@ import { BookSpread } from "./book-spread"
 import { AmbientSoundPanel } from "./ambient-sound"
 import { ReaderSettingsPanel } from "./reader-settings"
 import { Volume2 } from "lucide-react"
+import { useGestureHandler } from "@/hooks/use-gesture-handler"
 
 interface BookReaderProps {
   book: Book
@@ -35,8 +38,6 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
   const [showAmbientSound, setShowAmbientSound] = useState(false)
   const [settings, setSettings] = useState<ReaderSettings>(defaultReaderSettings)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const touchStartX = useRef<number>(0)
-  const touchEndX = useRef<number>(0)
   const [isMobile, setIsMobile] = useState(false)
 
   // Detect mobile viewport
@@ -46,27 +47,6 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
-
-  // Auto-hide controls
-  useEffect(() => {
-    const showControls = () => {
-      setControlsVisible(true)
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
-      controlsTimeoutRef.current = setTimeout(() => {
-        if (activeMenu === "none" && !showAmbientSound) setControlsVisible(false)
-      }, 3000)
-    }
-
-    window.addEventListener("mousemove", showControls)
-    window.addEventListener("keydown", showControls)
-    showControls()
-
-    return () => {
-      window.removeEventListener("mousemove", showControls)
-      window.removeEventListener("keydown", showControls)
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
-    }
-  }, [activeMenu, showAmbientSound])
 
   const turnPage = useCallback(
     (dir: number) => {
@@ -89,6 +69,40 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     [currentPage, book.total_pages, onPageChange, isMobile],
   )
 
+  // Use the new gesture handler hook for mobile touch interactions
+  const { gestureState, handlers: gestureHandlers, resetZoom } = useGestureHandler({
+    onSwipeLeft: () => turnPage(1),   // Swipe left = next page
+    onSwipeRight: () => turnPage(-1), // Swipe right = previous page
+    minSwipeDistance: 50,
+    swipeVelocityThreshold: 0.3,
+  })
+
+  // Reset zoom when changing pages via keyboard/buttons
+  useEffect(() => {
+    resetZoom()
+  }, [currentPage, resetZoom])
+
+  // Auto-hide controls
+  useEffect(() => {
+    const showControls = () => {
+      setControlsVisible(true)
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+      controlsTimeoutRef.current = setTimeout(() => {
+        if (activeMenu === "none" && !showAmbientSound) setControlsVisible(false)
+      }, 3000)
+    }
+
+    window.addEventListener("mousemove", showControls)
+    window.addEventListener("keydown", showControls)
+    showControls()
+
+    return () => {
+      window.removeEventListener("mousemove", showControls)
+      window.removeEventListener("keydown", showControls)
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
+    }
+  }, [activeMenu, showAmbientSound])
+
   // Keyboard Nav
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,32 +117,6 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [turnPage, onClose, activeMenu])
-
-  // Touch swipe handlers for mobile
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
-  }, [])
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX
-  }, [])
-
-  const handleTouchEnd = useCallback(() => {
-    const swipeDistance = touchStartX.current - touchEndX.current
-    const minSwipeDistance = 50
-
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      if (swipeDistance > 0) {
-        // Swiped left → next page
-        turnPage(1)
-      } else {
-        // Swiped right → previous page
-        turnPage(-1)
-      }
-    }
-    touchStartX.current = 0
-    touchEndX.current = 0
-  }, [turnPage])
 
   // Background style based on theme
   const getThemeStyles = () => {
@@ -287,15 +275,31 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
       {/* Book Container (Perspective) */}
       <div
         className="perspective-1000 relative flex h-full w-full items-center justify-center p-4 md:p-8 lg:p-12"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        {...gestureHandlers}
+        style={{ touchAction: gestureState.isZoomed ? 'none' : 'pan-y' }}
       >
+        {/* Zoom indicator for mobile */}
+        {isMobile && gestureState.isZoomed && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40">
+            <button
+              onClick={resetZoom}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md transition-colors ${settings.theme === "dark"
+                  ? "bg-white/10 text-white border border-white/20"
+                  : "bg-black/5 text-slate-700 border border-slate-200"
+                }`}
+            >
+              <ZoomOut size={14} />
+              {Math.round(gestureState.scale * 100)}% - Tap to reset
+            </button>
+          </div>
+        )}
+
         <BookSpread
           currentPage={currentPage}
           direction={direction}
           book={book}
           settings={settings}
+          zoomState={gestureState}
         />
       </div >
 
