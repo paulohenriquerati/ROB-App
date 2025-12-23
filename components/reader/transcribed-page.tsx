@@ -1,18 +1,41 @@
 "use client"
 
-import { useMemo } from "react"
-import type { PageContent, ContentBlock, ReaderSettings } from "@/lib/types"
+import { useMemo, useState, useCallback, useRef, useEffect } from "react"
+import type { PageContent, ContentBlock, ReaderSettings, Highlight } from "@/lib/types"
+import { HighlightToolbar, getHighlightColorClass, type HighlightColor } from "./highlight-toolbar"
 
 interface TranscribedPageProps {
     pageContent: PageContent
     settings: ReaderSettings
     className?: string
+    highlights?: Highlight[]
+    onCreateHighlight?: (text: string, color: HighlightColor) => void
+    onUpdateHighlight?: (id: string, color: HighlightColor) => void
+    onDeleteHighlight?: (id: string) => void
+    onShareQuote?: (text: string) => void
 }
 
 /**
  * Renders transcribed PDF content with proper typography and image placement
  */
-export function TranscribedPage({ pageContent, settings, className = "" }: TranscribedPageProps) {
+export function TranscribedPage({
+    pageContent,
+    settings,
+    className = "",
+    highlights = [],
+    onCreateHighlight,
+    onUpdateHighlight,
+    onDeleteHighlight,
+    onShareQuote,
+}: TranscribedPageProps) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [selection, setSelection] = useState<{
+        text: string
+        rect: DOMRect | null
+    } | null>(null)
+    const [activeHighlight, setActiveHighlight] = useState<Highlight | null>(null)
+    const [toolbarPosition, setToolbarPosition] = useState<{ x: number; y: number } | null>(null)
+
     // Calculate styles based on reader settings
     const containerStyles = useMemo(() => {
         const fontSizeMap = {
@@ -78,6 +101,151 @@ export function TranscribedPage({ pageContent, settings, className = "" }: Trans
         }
     }, [settings.theme])
 
+    // Handle text selection
+    const handleMouseUp = useCallback(() => {
+        const windowSelection = window.getSelection()
+        if (!windowSelection || windowSelection.isCollapsed) {
+            // Check if clicked on highlight
+            return
+        }
+
+        const text = windowSelection.toString().trim()
+        if (text.length < 3) return
+
+        const range = windowSelection.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+
+        setSelection({ text, rect })
+        setActiveHighlight(null)
+        setToolbarPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10,
+        })
+    }, [])
+
+    // Handle clicking on existing highlights
+    const handleHighlightClick = useCallback((highlight: Highlight, event: React.MouseEvent) => {
+        event.stopPropagation()
+        const rect = (event.target as HTMLElement).getBoundingClientRect()
+        setActiveHighlight(highlight)
+        setSelection(null)
+        setToolbarPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10,
+        })
+    }, [])
+
+    // Close toolbar
+    const closeToolbar = useCallback(() => {
+        setSelection(null)
+        setActiveHighlight(null)
+        setToolbarPosition(null)
+        window.getSelection()?.removeAllRanges()
+    }, [])
+
+    // Handle create highlight
+    const handleHighlight = useCallback((color: HighlightColor) => {
+        if (selection?.text && onCreateHighlight) {
+            onCreateHighlight(selection.text, color)
+        }
+        closeToolbar()
+    }, [selection, onCreateHighlight, closeToolbar])
+
+    // Handle color change
+    const handleColorChange = useCallback((color: HighlightColor) => {
+        if (activeHighlight && onUpdateHighlight) {
+            onUpdateHighlight(activeHighlight.id, color)
+        }
+        closeToolbar()
+    }, [activeHighlight, onUpdateHighlight, closeToolbar])
+
+    // Handle delete
+    const handleDelete = useCallback(() => {
+        if (activeHighlight && onDeleteHighlight) {
+            onDeleteHighlight(activeHighlight.id)
+        }
+        closeToolbar()
+    }, [activeHighlight, onDeleteHighlight, closeToolbar])
+
+    // Handle share
+    const handleShare = useCallback(() => {
+        const text = selection?.text || activeHighlight?.text
+        if (text && onShareQuote) {
+            onShareQuote(text)
+        }
+        closeToolbar()
+    }, [selection, activeHighlight, onShareQuote, closeToolbar])
+
+    // Close toolbar on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                closeToolbar()
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [closeToolbar])
+
+    // Apply highlights to text content
+    const applyHighlights = useCallback((text: string): React.ReactNode => {
+        if (!text || highlights.length === 0) return text
+
+        // Find all matching highlights for this text
+        const matches: { start: number; end: number; highlight: Highlight }[] = []
+
+        for (const hl of highlights) {
+            let startIndex = 0
+            while (startIndex < text.length) {
+                const index = text.indexOf(hl.text, startIndex)
+                if (index === -1) break
+                matches.push({
+                    start: index,
+                    end: index + hl.text.length,
+                    highlight: hl,
+                })
+                startIndex = index + 1
+            }
+        }
+
+        if (matches.length === 0) return text
+
+        // Sort by start position
+        matches.sort((a, b) => a.start - b.start)
+
+        // Build result with highlighted spans
+        const result: React.ReactNode[] = []
+        let lastIndex = 0
+
+        for (const match of matches) {
+            // Add text before highlight
+            if (match.start > lastIndex) {
+                result.push(text.slice(lastIndex, match.start))
+            }
+
+            // Add highlighted text
+            result.push(
+                <mark
+                    key={`${match.highlight.id}-${match.start}`}
+                    className={`cursor-pointer rounded-sm px-0.5 -mx-0.5 transition-all hover:opacity-80 ${getHighlightColorClass(match.highlight.color, settings.theme)}`}
+                    onClick={(e) => handleHighlightClick(match.highlight, e)}
+                >
+                    {match.highlight.text}
+                </mark>
+            )
+
+            lastIndex = match.end
+        }
+
+        // Add remaining text
+        if (lastIndex < text.length) {
+            result.push(text.slice(lastIndex))
+        }
+
+        return result
+    }, [highlights, settings.theme, handleHighlightClick])
+
     // Render a single content block
     const renderBlock = (block: ContentBlock, index: number) => {
         switch (block.type) {
@@ -92,7 +260,7 @@ export function TranscribedPage({ pageContent, settings, className = "" }: Trans
                             lineHeight: "1.3",
                         }}
                     >
-                        {block.content}
+                        {applyHighlights(block.content || "")}
                     </h2>
                 )
 
@@ -109,7 +277,7 @@ export function TranscribedPage({ pageContent, settings, className = "" }: Trans
                             textIndent: index > 0 ? "1.5em" : undefined,
                         }}
                     >
-                        {block.content}
+                        {applyHighlights(block.content || "")}
                     </p>
                 )
 
@@ -147,12 +315,14 @@ export function TranscribedPage({ pageContent, settings, className = "" }: Trans
 
     return (
         <div
+            ref={containerRef}
             className={`h-full overflow-y-auto ${className}`}
             style={{
                 ...containerStyles,
                 backgroundColor: themeStyles.background,
                 color: themeStyles.color,
             }}
+            onMouseUp={handleMouseUp}
         >
             {/* Page number indicator */}
             <div
@@ -164,13 +334,28 @@ export function TranscribedPage({ pageContent, settings, className = "" }: Trans
 
             {/* Render content blocks */}
             {hasContent ? (
-                <div className="prose-container">
+                <div className="prose-container select-text">
                     {pageContent.blocks.map((block, index) => renderBlock(block, index))}
                 </div>
             ) : (
                 <div className="flex h-full items-center justify-center text-center opacity-50">
                     <p>No content extracted from this page</p>
                 </div>
+            )}
+
+            {/* Highlight toolbar */}
+            {toolbarPosition && (selection || activeHighlight) && (
+                <HighlightToolbar
+                    position={toolbarPosition}
+                    selectedText={selection?.text || activeHighlight?.text || ""}
+                    existingHighlightId={activeHighlight?.id}
+                    existingColor={activeHighlight?.color}
+                    onHighlight={handleHighlight}
+                    onColorChange={handleColorChange}
+                    onDelete={activeHighlight ? handleDelete : undefined}
+                    onShare={onShareQuote ? handleShare : undefined}
+                    onClose={closeToolbar}
+                />
             )}
         </div>
     )
@@ -181,6 +366,11 @@ interface TranscribedSpreadProps {
     rightPage?: PageContent
     settings: ReaderSettings
     isMobile?: boolean
+    highlights?: Highlight[]
+    onCreateHighlight?: (page: number, text: string, color: HighlightColor) => void
+    onUpdateHighlight?: (id: string, color: HighlightColor) => void
+    onDeleteHighlight?: (id: string) => void
+    onShareQuote?: (text: string, page: number) => void
 }
 
 /**
@@ -191,7 +381,15 @@ export function TranscribedSpread({
     rightPage,
     settings,
     isMobile = false,
+    highlights = [],
+    onCreateHighlight,
+    onUpdateHighlight,
+    onDeleteHighlight,
+    onShareQuote,
 }: TranscribedSpreadProps) {
+    // Get highlights for a specific page
+    const getPageHighlights = (page: number) => highlights.filter((h) => h.page === page)
+
     // Theme background for the spread container
     const getSpreadBackground = () => {
         switch (settings.theme) {
@@ -216,7 +414,18 @@ export function TranscribedSpread({
                 className={`relative h-full w-full overflow-hidden rounded-sm shadow-2xl ${getSpreadBackground()}`}
                 style={{ filter: `brightness(${settings.brightness}%)` }}
             >
-                <TranscribedPage pageContent={currentPage} settings={settings} className="h-full" />
+                <TranscribedPage
+                    pageContent={currentPage}
+                    settings={settings}
+                    className="h-full"
+                    highlights={getPageHighlights(currentPage.pageNumber)}
+                    onCreateHighlight={(text, color) =>
+                        onCreateHighlight?.(currentPage.pageNumber, text, color)
+                    }
+                    onUpdateHighlight={onUpdateHighlight}
+                    onDeleteHighlight={onDeleteHighlight}
+                    onShareQuote={(text) => onShareQuote?.(text, currentPage.pageNumber)}
+                />
             </div>
         )
     }
@@ -234,7 +443,18 @@ export function TranscribedSpread({
             <div className="relative flex-1 overflow-hidden border-r border-inherit">
                 <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/5 to-transparent" />
                 {leftPage ? (
-                    <TranscribedPage pageContent={leftPage} settings={settings} className="h-full" />
+                    <TranscribedPage
+                        pageContent={leftPage}
+                        settings={settings}
+                        className="h-full"
+                        highlights={getPageHighlights(leftPage.pageNumber)}
+                        onCreateHighlight={(text, color) =>
+                            onCreateHighlight?.(leftPage.pageNumber, text, color)
+                        }
+                        onUpdateHighlight={onUpdateHighlight}
+                        onDeleteHighlight={onDeleteHighlight}
+                        onShareQuote={(text) => onShareQuote?.(text, leftPage.pageNumber)}
+                    />
                 ) : (
                     <div className="flex h-full items-center justify-center">
                         <span className="text-xs opacity-30">Inside Cover</span>
@@ -246,7 +466,18 @@ export function TranscribedSpread({
             <div className="relative flex-1 overflow-hidden border-l border-inherit">
                 <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-l from-black/5 to-transparent" />
                 {rightPage ? (
-                    <TranscribedPage pageContent={rightPage} settings={settings} className="h-full" />
+                    <TranscribedPage
+                        pageContent={rightPage}
+                        settings={settings}
+                        className="h-full"
+                        highlights={getPageHighlights(rightPage.pageNumber)}
+                        onCreateHighlight={(text, color) =>
+                            onCreateHighlight?.(rightPage.pageNumber, text, color)
+                        }
+                        onUpdateHighlight={onUpdateHighlight}
+                        onDeleteHighlight={onDeleteHighlight}
+                        onShareQuote={(text) => onShareQuote?.(text, rightPage.pageNumber)}
+                    />
                 ) : (
                     <div className="flex h-full items-center justify-center">
                         <span className="text-xs opacity-30">End of book</span>

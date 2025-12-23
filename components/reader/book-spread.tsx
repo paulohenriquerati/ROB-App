@@ -1,10 +1,11 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { type Book, type ReaderSettings, type PageContent } from "@/lib/types"
+import { type Book, type ReaderSettings, type PageContent, type Highlight } from "@/lib/types"
 import { PdfPage } from "./pdf-page"
 import { TranscribedPage } from "./transcribed-page"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import type { HighlightColor } from "./highlight-toolbar"
 
 interface BookSpreadProps {
     currentPage: number
@@ -12,9 +13,23 @@ interface BookSpreadProps {
     book: Book
     settings: ReaderSettings
     transcribedPages?: Map<number, PageContent>
+    highlights?: Highlight[]
+    onCreateHighlight?: (page: number, text: string, color: HighlightColor) => void
+    onUpdateHighlight?: (id: string, color: HighlightColor) => void
+    onDeleteHighlight?: (id: string) => void
 }
 
-export function BookSpread({ currentPage, direction, book, settings, transcribedPages }: BookSpreadProps) {
+export function BookSpread({
+    currentPage,
+    direction,
+    book,
+    settings,
+    transcribedPages,
+    highlights = [],
+    onCreateHighlight,
+    onUpdateHighlight,
+    onDeleteHighlight,
+}: BookSpreadProps) {
     const [pdfFailed, setPdfFailed] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
 
@@ -39,6 +54,12 @@ export function BookSpread({ currentPage, direction, book, settings, transcribed
         return "from-black/5 via-black/20 to-black/5 mix-blend-multiply"
     }
 
+    // Get highlights for a specific page
+    const getPageHighlights = useCallback(
+        (page: number) => highlights.filter((h) => h.page === page),
+        [highlights]
+    )
+
     const getPageContent = (page: number) => {
         // First, check if we have transcribed content for this page
         if (transcribedPages && transcribedPages.has(page)) {
@@ -49,6 +70,10 @@ export function BookSpread({ currentPage, direction, book, settings, transcribed
                         pageContent={pageContent}
                         settings={settings}
                         className="h-full w-full"
+                        highlights={getPageHighlights(page)}
+                        onCreateHighlight={(text, color) => onCreateHighlight?.(page, text, color)}
+                        onUpdateHighlight={onUpdateHighlight}
+                        onDeleteHighlight={onDeleteHighlight}
                     />
                 </div>
             )
@@ -190,21 +215,11 @@ export function BookSpread({ currentPage, direction, book, settings, transcribed
         }),
     }
 
-    // Calculate zoom transform styles
-    const zoomTransform = zoomState && zoomState.scale > 1
-        ? {
-            transform: `scale(${zoomState.scale}) translate(${zoomState.translateX / zoomState.scale}px, ${zoomState.translateY / zoomState.scale}px)`,
-            transition: zoomState.isPinching ? 'none' : 'transform 0.2s ease-out',
-        }
-        : {}
-
     return (
         <div
             className={`relative flex w-full max-w-5xl bg-transparent shadow-2xl transition-all duration-500 rounded-sm ${isMobile ? 'aspect-[2/3]' : 'aspect-[3/2]'}`}
             style={{
                 filter: `brightness(${settings.brightness}%)`,
-                ...zoomTransform,
-                transformOrigin: 'center center',
             }}
         >
             {/* Spine Shadow - hidden on mobile */}

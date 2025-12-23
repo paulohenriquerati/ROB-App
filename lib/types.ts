@@ -33,6 +33,8 @@ export interface Highlight {
   page: number
   text: string
   color: "yellow" | "green" | "blue" | "pink"
+  start_offset?: number
+  end_offset?: number
   created_at: string
 }
 

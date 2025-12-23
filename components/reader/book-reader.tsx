@@ -23,6 +23,9 @@ import { ReaderSettingsPanel } from "./reader-settings"
 import { Volume2 } from "lucide-react"
 import { ZoomControls, useZoom } from "./zoom-controls"
 import { getBookContent } from "@/lib/actions/transcription"
+import { useHighlights } from "@/lib/hooks/use-highlights"
+import { createHighlight, updateHighlightColor, deleteHighlight } from "@/lib/actions/highlights"
+import type { HighlightColor } from "./highlight-toolbar"
 
 interface BookReaderProps {
   book: Book
@@ -41,6 +44,59 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [transcribedPages, setTranscribedPages] = useState<Map<number, PageContent>>(new Map())
   const [isTranscribed, setIsTranscribed] = useState(book.transcription_status === "completed")
+
+  // Highlights management
+  const { highlights, getPageHighlights, addHighlight, removeHighlight, updateColor, mutate: mutateHighlights } = useHighlights(book.id)
+
+  // Handle creating a new highlight
+  const handleCreateHighlight = async (page: number, text: string, color: HighlightColor) => {
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`
+    addHighlight({
+      id: tempId,
+      book_id: book.id,
+      user_id: '',
+      page,
+      text,
+      color,
+      created_at: new Date().toISOString(),
+    })
+
+    // Server update
+    const { highlight, error } = await createHighlight({
+      book_id: book.id,
+      page,
+      text,
+      color,
+    })
+
+    if (error) {
+      console.error('Failed to create highlight:', error)
+      mutateHighlights() // Revert
+    } else if (highlight) {
+      mutateHighlights() // Sync with server
+    }
+  }
+
+  // Handle updating highlight color
+  const handleUpdateHighlight = async (id: string, color: HighlightColor) => {
+    updateColor(id, color)
+    const { error } = await updateHighlightColor(id, color)
+    if (error) {
+      console.error('Failed to update highlight:', error)
+      mutateHighlights()
+    }
+  }
+
+  // Handle deleting a highlight
+  const handleDeleteHighlight = async (id: string) => {
+    removeHighlight(id)
+    const { error } = await deleteHighlight(id)
+    if (error) {
+      console.error('Failed to delete highlight:', error)
+      mutateHighlights()
+    }
+  }
 
   // Detect mobile viewport
   useEffect(() => {
@@ -365,8 +421,8 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
           <div className="absolute top-20 right-4 z-40">
             <div
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md ${settings.theme === "dark"
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                : "bg-amber-50 text-amber-700 border border-amber-200"
                 }`}
             >
               <Sparkles size={12} />
@@ -386,6 +442,10 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
             book={book}
             settings={settings}
             transcribedPages={isTranscribed ? transcribedPages : undefined}
+            highlights={highlights}
+            onCreateHighlight={handleCreateHighlight}
+            onUpdateHighlight={handleUpdateHighlight}
+            onDeleteHighlight={handleDeleteHighlight}
           />
         </div>
       </div>
