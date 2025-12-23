@@ -12,6 +12,9 @@ export interface Book {
   genre?: string
   description?: string
   user_id: string
+  // Transcription fields
+  transcription_status?: 'pending' | 'processing' | 'completed' | 'failed'
+  transcription_progress?: number
 }
 
 export interface BookNote {
@@ -130,4 +133,88 @@ export interface BookLegacy {
   readingSessions: ReadingSession[]
   genre?: string
   description?: string
+}
+
+// ================================================
+// PDF Transcription Types
+// ================================================
+
+/**
+ * Bounding box for positioned content within a PDF page
+ */
+export interface ContentBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Style information for text content
+ */
+export interface ContentStyle {
+  fontSize?: number
+  fontFamily?: string
+  fontWeight?: 'normal' | 'bold'
+  fontStyle?: 'normal' | 'italic'
+  color?: string
+}
+
+/**
+ * A single content block (text, image, or heading) from a PDF page
+ */
+export interface ContentBlock {
+  type: 'text' | 'image' | 'heading' | 'paragraph'
+  content?: string // For text/heading blocks
+  src?: string // For image blocks - URL to the extracted image
+  alt?: string // Alt text for images
+  bounds: ContentBounds
+  style?: ContentStyle
+  order: number // Reading order within the page
+}
+
+/**
+ * Structured content for a single PDF page
+ */
+export interface PageContent {
+  pageNumber: number
+  blocks: ContentBlock[]
+  textContent: string // Plain text for search/TTS
+  hasImages: boolean
+  extractedAt: string
+}
+
+/**
+ * Full book content with all transcribed pages
+ */
+export interface BookContent {
+  bookId: string
+  pages: PageContent[]
+  totalPages: number
+  status: TranscriptionStatus
+}
+
+/**
+ * Transcription status enum
+ */
+export type TranscriptionStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+/**
+ * Progress update during transcription
+ */
+export interface TranscriptionProgress {
+  bookId: string
+  currentPage: number
+  totalPages: number
+  status: TranscriptionStatus
+  error?: string
+}
+
+/**
+ * Options for the transcription process
+ */
+export interface TranscriptionOptions {
+  extractImages?: boolean
+  preserveLayout?: boolean
+  onProgress?: (progress: TranscriptionProgress) => void
 }

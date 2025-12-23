@@ -1,8 +1,8 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Star, MoreVertical } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Star, MoreVertical, Sparkles, FileText, Loader2 } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 
 interface BookCardProps {
@@ -12,15 +12,19 @@ interface BookCardProps {
   onRate: (book: any, rating: number) => void
   onEdit: (book: any) => void
   onDelete: (book: any) => void
+  onTranscribe?: (book: any) => void
 }
 
-export function BookCard({ book, index, onOpen, onRate, onEdit, onDelete }: BookCardProps) {
+export function BookCard({ book, index, onOpen, onRate, onEdit, onDelete, onTranscribe }: BookCardProps) {
   const totalPages = book.totalPages ?? book.total_pages ?? 100
   const currentPage = book.currentPage ?? book.current_page ?? 0
   const coverUrl = book.coverUrl ?? book.cover_url ?? "/open-book-library.png"
   const lastRead = book.lastRead ?? (book.last_read ? new Date(book.last_read) : null)
+  const transcriptionStatus = book.transcription_status ?? "pending"
 
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
+  const isTranscribed = transcriptionStatus === "completed"
+  const isTranscribing = transcriptionStatus === "processing"
 
   return (
     <motion.div
@@ -52,6 +56,22 @@ export function BookCard({ book, index, onOpen, onRate, onEdit, onDelete }: Book
                 transition={{ duration: 0.8, delay: index * 0.05 + 0.3 }}
                 className="h-full bg-accent"
               />
+            </div>
+          )}
+
+          {/* Transcription Badge */}
+          {isTranscribed && (
+            <div className="absolute left-2 top-2 flex items-center gap-1 rounded bg-gradient-to-r from-amber-500 to-orange-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
+              <Sparkles className="h-3 w-3" />
+              Enhanced
+            </div>
+          )}
+
+          {/* Transcribing Badge */}
+          {isTranscribing && (
+            <div className="absolute left-2 top-2 flex items-center gap-1 rounded bg-blue-500 px-2 py-0.5 text-xs font-medium text-white shadow-sm">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Processing
             </div>
           )}
 
@@ -92,6 +112,29 @@ export function BookCard({ book, index, onOpen, onRate, onEdit, onDelete }: Book
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* Transcription option */}
+                {onTranscribe && !isTranscribed && !isTranscribing && book.pdf_url && (
+                  <DropdownMenuItem
+                    onClick={(e) => { e.stopPropagation(); onTranscribe(book); }}
+                    className="text-amber-600 dark:text-amber-400"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Enhance with AI
+                  </DropdownMenuItem>
+                )}
+                {isTranscribed && (
+                  <DropdownMenuItem disabled className="text-green-600 dark:text-green-400">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Already Enhanced
+                  </DropdownMenuItem>
+                )}
+                {isTranscribing && (
+                  <DropdownMenuItem disabled>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(book); }}>Edit Details</DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(book); }} className="text-destructive">
                   Remove

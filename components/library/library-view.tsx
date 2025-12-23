@@ -9,6 +9,7 @@ import { BookGrid } from "./book-grid"
 import { BookReader } from "../reader/book-reader"
 import { EditBookModal } from "./edit-book-modal"
 import { AddBookModal } from "./add-book-modal"
+import { TranscriptionModal } from "./transcription-modal"
 import { StatsDashboard } from "../stats/stats-dashboard"
 import { CommunityFeed } from "../social/community-feed"
 import { useBooks } from "@/lib/hooks/use-books"
@@ -32,6 +33,7 @@ export function LibraryView() {
   const [isUploading, setIsUploading] = useState(false)
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
   const [activeView, setActiveView] = useState<"library" | "stats" | "community">("library")
+  const [transcribingBook, setTranscribingBook] = useState<Book | null>(null)
 
   const handleOpenBook = useCallback((book: Book) => {
     setSelectedBook(book)
@@ -81,6 +83,15 @@ export function LibraryView() {
     },
     [mutate],
   )
+
+  const handleTranscribeBook = useCallback((book: Book) => {
+    setTranscribingBook(book)
+  }, [])
+
+  const handleTranscriptionComplete = useCallback(() => {
+    setTranscribingBook(null)
+    mutate() // Refresh books to update transcription status
+  }, [mutate])
 
   const handleUpload = useCallback(
     async (files: FileList) => {
@@ -181,7 +192,7 @@ export function LibraryView() {
                     onRateBook={handleRateBook as any}
                     onEditBook={handleEditBook as any}
                     onDeleteBook={handleDeleteBook as any}
-
+                    onTranscribeBook={handleTranscribeBook as any}
                     onAddBook={() => setIsAddBookOpen(true)}
                   />
                 )}
@@ -255,6 +266,16 @@ export function LibraryView() {
           />
         )}
       </AnimatePresence>
+
+      {/* Transcription Modal */}
+      {transcribingBook && (
+        <TranscriptionModal
+          book={transcribingBook}
+          isOpen={!!transcribingBook}
+          onClose={() => setTranscribingBook(null)}
+          onComplete={handleTranscriptionComplete}
+        />
+      )}
     </div>
   )
 }

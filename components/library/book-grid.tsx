@@ -12,6 +12,7 @@ interface BookGridProps {
   onRateBook: (book: any, rating: number) => void
   onEditBook: (book: any) => void
   onDeleteBook: (book: any) => void
+  onTranscribeBook?: (book: any) => void
   onAddBook: () => void
 }
 
@@ -22,6 +23,7 @@ export function BookGrid({
   onRateBook,
   onEditBook,
   onDeleteBook,
+  onTranscribeBook,
   onAddBook,
 }: BookGridProps) {
   // Filter and sort books
@@ -77,6 +79,7 @@ export function BookGrid({
             onRate={onRateBook}
             onEdit={onEditBook}
             onDelete={onDeleteBook}
+            onTranscribe={onTranscribeBook}
           />
         ))}
       </AnimatePresence>

@@ -12,17 +12,17 @@ import {
   Plus,
   Star,
   Settings,
-  ZoomIn,
-  ZoomOut,
+  Sparkles,
 } from "lucide-react"
-import { useState, useCallback, useEffect, useRef } from "react"
-import { type Book, type ReaderSettings } from "@/lib/types"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
+import { type Book, type ReaderSettings, type PageContent } from "@/lib/types"
 import { defaultReaderSettings } from "@/lib/store"
 import { BookSpread } from "./book-spread"
 import { AmbientSoundPanel } from "./ambient-sound"
 import { ReaderSettingsPanel } from "./reader-settings"
 import { Volume2 } from "lucide-react"
-import { useGestureHandler } from "@/hooks/use-gesture-handler"
+import { ZoomControls, useZoom } from "./zoom-controls"
+import { getBookContent } from "@/lib/actions/transcription"
 
 interface BookReaderProps {
   book: Book
@@ -39,6 +39,8 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
   const [settings, setSettings] = useState<ReaderSettings>(defaultReaderSettings)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [transcribedPages, setTranscribedPages] = useState<Map<number, PageContent>>(new Map())
+  const [isTranscribed, setIsTranscribed] = useState(book.transcription_status === "completed")
 
   // Detect mobile viewport
   useEffect(() => {
@@ -47,6 +49,20 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Load transcribed content if available
+  useEffect(() => {
+    if (book.transcription_status === "completed") {
+      getBookContent(book.id).then(({ pages, error }) => {
+        if (!error && pages.length > 0) {
+          const pageMap = new Map<number, PageContent>()
+          pages.forEach(page => pageMap.set(page.pageNumber, page))
+          setTranscribedPages(pageMap)
+          setIsTranscribed(true)
+        }
+      })
+    }
+  }, [book.id, book.transcription_status])
 
   const turnPage = useCallback(
     (dir: number) => {
@@ -69,18 +85,56 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     [currentPage, book.total_pages, onPageChange, isMobile],
   )
 
-  // Use the new gesture handler hook for mobile touch interactions
-  const { gestureState, handlers: gestureHandlers, resetZoom } = useGestureHandler({
-    onSwipeLeft: () => turnPage(1),   // Swipe left = next page
-    onSwipeRight: () => turnPage(-1), // Swipe right = previous page
-    minSwipeDistance: 50,
-    swipeVelocityThreshold: 0.3,
-  })
+  // Use zoom controls hook
+  const {
+    zoomState,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    zoomHandlers,
+    getTransformStyle,
+  } = useZoom({ minScale: 1, maxScale: 3, zoomStep: 0.5 })
 
-  // Reset zoom when changing pages via keyboard/buttons
+  // Reset zoom when changing pages
   useEffect(() => {
     resetZoom()
   }, [currentPage, resetZoom])
+
+  // Touch swipe for page navigation (only when not zoomed)
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 })
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1 && !zoomState.isZoomed) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now(),
+      }
+    }
+    // Also call zoom handlers for pinch
+    zoomHandlers.onTouchStart(e)
+  }, [zoomState.isZoomed, zoomHandlers])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    zoomHandlers.onTouchEnd(e)
+
+    // Only handle swipe for page navigation when not zoomed
+    if (!zoomState.isZoomed && e.changedTouches.length === 1) {
+      const touch = e.changedTouches[0]
+      const deltaX = touch.clientX - touchStartRef.current.x
+      const deltaY = Math.abs(touch.clientY - touchStartRef.current.y)
+      const elapsed = Date.now() - touchStartRef.current.time
+
+      // Quick horizontal swipe
+      if (Math.abs(deltaX) > 50 && deltaY < 100 && elapsed < 300) {
+        if (deltaX < 0) {
+          turnPage(1) // Swipe left = next
+        } else {
+          turnPage(-1) // Swipe right = prev
+        }
+      }
+    }
+  }, [zoomState.isZoomed, zoomHandlers, turnPage])
 
   // Auto-hide controls
   useEffect(() => {
@@ -275,33 +329,66 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
       {/* Book Container (Perspective) */}
       <div
         className="perspective-1000 relative flex h-full w-full items-center justify-center p-4 md:p-8 lg:p-12"
-        {...gestureHandlers}
-        style={{ touchAction: gestureState.isZoomed ? 'none' : 'pan-y' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={zoomHandlers.onTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={zoomHandlers.onMouseDown}
+        onMouseMove={zoomHandlers.onMouseMove}
+        onMouseUp={zoomHandlers.onMouseUp}
+        onMouseLeave={zoomHandlers.onMouseUp}
+        onWheel={zoomHandlers.onWheel}
+        style={{ touchAction: zoomState.isZoomed ? 'none' : 'pan-y' }}
       >
-        {/* Zoom indicator for mobile */}
-        {isMobile && gestureState.isZoomed && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40">
-            <button
-              onClick={resetZoom}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md transition-colors ${settings.theme === "dark"
-                  ? "bg-white/10 text-white border border-white/20"
-                  : "bg-black/5 text-slate-700 border border-slate-200"
+        {/* Zoom Controls */}
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40">
+          <AnimatePresence>
+            {controlsVisible && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <ZoomControls
+                  zoomState={zoomState}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                  onReset={resetZoom}
+                  theme={settings.theme}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Transcription indicator */}
+        {isTranscribed && (
+          <div className="absolute top-20 right-4 z-40">
+            <div
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md ${settings.theme === "dark"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
                 }`}
             >
-              <ZoomOut size={14} />
-              {Math.round(gestureState.scale * 100)}% - Tap to reset
-            </button>
+              <Sparkles size={12} />
+              Enhanced Text
+            </div>
           </div>
         )}
 
-        <BookSpread
-          currentPage={currentPage}
-          direction={direction}
-          book={book}
-          settings={settings}
-          zoomState={gestureState}
-        />
-      </div >
+        {/* Zoomable content wrapper */}
+        <div
+          style={getTransformStyle()}
+          className="relative w-full max-w-5xl"
+        >
+          <BookSpread
+            currentPage={currentPage}
+            direction={direction}
+            book={book}
+            settings={settings}
+            transcribedPages={isTranscribed ? transcribedPages : undefined}
+          />
+        </div>
+      </div>
 
       {/* Bottom Progress Bar */}
       <AnimatePresence>

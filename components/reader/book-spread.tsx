@@ -1,20 +1,20 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { type Book, type ReaderSettings } from "@/lib/types"
+import { type Book, type ReaderSettings, type PageContent } from "@/lib/types"
 import { PdfPage } from "./pdf-page"
+import { TranscribedPage } from "./transcribed-page"
 import { useState, useEffect } from "react"
-import { type GestureState } from "@/hooks/use-gesture-handler"
 
 interface BookSpreadProps {
     currentPage: number
     direction: number
     book: Book
     settings: ReaderSettings
-    zoomState?: GestureState
+    transcribedPages?: Map<number, PageContent>
 }
 
-export function BookSpread({ currentPage, direction, book, settings, zoomState }: BookSpreadProps) {
+export function BookSpread({ currentPage, direction, book, settings, transcribedPages }: BookSpreadProps) {
     const [pdfFailed, setPdfFailed] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
 
@@ -40,6 +40,20 @@ export function BookSpread({ currentPage, direction, book, settings, zoomState }
     }
 
     const getPageContent = (page: number) => {
+        // First, check if we have transcribed content for this page
+        if (transcribedPages && transcribedPages.has(page)) {
+            const pageContent = transcribedPages.get(page)!
+            return (
+                <div className="h-full w-full overflow-y-auto">
+                    <TranscribedPage
+                        pageContent={pageContent}
+                        settings={settings}
+                        className="h-full w-full"
+                    />
+                </div>
+            )
+        }
+
         // If we have a PDF URL and it hasn't failed, render the PDF page
         if ((book.pdf_url || (book as any).pdfUrl) && !pdfFailed) {
             // PDF pages are 1-based, matching our page number
