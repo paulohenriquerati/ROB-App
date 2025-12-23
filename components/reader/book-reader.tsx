@@ -230,13 +230,6 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
                 >
                   <Type size={20} />
                 </button>
-                <ReaderSettingsPanel
-                  settings={settings}
-                  onSettingsChange={setSettings}
-                  isOpen={activeMenu === "settings"}
-                  onClose={() => setActiveMenu("none")}
-                />
-
               </div>
 
               {/* Rating Toggle */}
@@ -282,6 +275,14 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
         }
 
       </AnimatePresence >
+
+      {/* Reader Settings Panel - placed outside AnimatePresence to prevent clipping from transform */}
+      <ReaderSettingsPanel
+        settings={settings}
+        onSettingsChange={setSettings}
+        isOpen={activeMenu === "settings"}
+        onClose={() => setActiveMenu("none")}
+      />
 
       {/* Book Container (Perspective) */}
       <div
