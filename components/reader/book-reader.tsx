@@ -35,6 +35,17 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
   const [showAmbientSound, setShowAmbientSound] = useState(false)
   const [settings, setSettings] = useState<ReaderSettings>(defaultReaderSettings)
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const touchStartX = useRef<number>(0)
+  const touchEndX = useRef<number>(0)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Auto-hide controls
   useEffect(() => {
@@ -42,7 +53,7 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
       setControlsVisible(true)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
       controlsTimeoutRef.current = setTimeout(() => {
-        if (activeMenu === "none") setControlsVisible(false)
+        if (activeMenu === "none" && !showAmbientSound) setControlsVisible(false)
       }, 3000)
     }
 
@@ -55,12 +66,13 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
       window.removeEventListener("keydown", showControls)
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
     }
-  }, [activeMenu])
+  }, [activeMenu, showAmbientSound])
 
   const turnPage = useCallback(
     (dir: number) => {
-      // Advance by 2 pages (one spread) at a time
-      const newPage = currentPage + (dir * 2)
+      // On mobile: advance by 1 page; on desktop: advance by 2 (one spread)
+      const increment = isMobile ? 1 : 2
+      const newPage = currentPage + (dir * increment)
       // Ensure we stay within bounds. 
       // For PDF view, pages are 1-based.
       if (newPage >= 1 && newPage <= book.total_pages) {
@@ -68,13 +80,13 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
         setCurrentPage(newPage)
         onPageChange(newPage)
       } else if (dir > 0 && currentPage < book.total_pages) {
-        // If we can't advance by 2 but there's still a page, go to last page
+        // If we can't advance by increment but there's still a page, go to last page
         setDirection(dir)
         setCurrentPage(book.total_pages)
         onPageChange(book.total_pages)
       }
     },
-    [currentPage, book.total_pages, onPageChange],
+    [currentPage, book.total_pages, onPageChange, isMobile],
   )
 
   // Keyboard Nav
@@ -91,6 +103,32 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [turnPage, onClose, activeMenu])
+
+  // Touch swipe handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    const swipeDistance = touchStartX.current - touchEndX.current
+    const minSwipeDistance = 50
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      if (swipeDistance > 0) {
+        // Swiped left → next page
+        turnPage(1)
+      } else {
+        // Swiped right → previous page
+        turnPage(-1)
+      }
+    }
+    touchStartX.current = 0
+    touchEndX.current = 0
+  }, [turnPage])
 
   // Background style based on theme
   const getThemeStyles = () => {
@@ -246,7 +284,12 @@ export function BookReader({ book, onClose, onPageChange }: BookReaderProps) {
       </AnimatePresence >
 
       {/* Book Container (Perspective) */}
-      < div className="perspective-1000 relative flex h-full w-full items-center justify-center p-4 md:p-8 lg:p-12" >
+      <div
+        className="perspective-1000 relative flex h-full w-full items-center justify-center p-4 md:p-8 lg:p-12"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <BookSpread
           currentPage={currentPage}
           direction={direction}

@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { type Book, type ReaderSettings } from "@/lib/types"
 import { PdfPage } from "./pdf-page"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface BookSpreadProps {
     currentPage: number
@@ -14,6 +14,15 @@ interface BookSpreadProps {
 
 export function BookSpread({ currentPage, direction, book, settings }: BookSpreadProps) {
     const [pdfFailed, setPdfFailed] = useState(false)
+    const [isMobile, setIsMobile] = useState(false)
+
+    // Detect mobile viewport
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768)
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
 
     const getPageStyles = () => {
         if (settings.theme === "sepia") return "bg-[#F4ECD8] text-[#433422] border-[#E8DCC0]"
@@ -167,38 +176,42 @@ export function BookSpread({ currentPage, direction, book, settings }: BookSprea
 
     return (
         <div
-            className="relative flex aspect-[3/2] w-full max-w-5xl bg-transparent shadow-2xl transition-all duration-500 rounded-sm"
+            className={`relative flex w-full max-w-5xl bg-transparent shadow-2xl transition-all duration-500 rounded-sm ${isMobile ? 'aspect-[2/3]' : 'aspect-[3/2]'}`}
             style={{ filter: `brightness(${settings.brightness}%)` }}
         >
-            {/* Spine Shadow */}
-            <div
-                className={`pointer-events-none absolute bottom-0 left-1/2 top-0 z-30 w-12 -translate-x-1/2 bg-gradient-to-r blur-sm ${getSpineStyles()}`}
-            />
-
-            {/* Left Page */}
-            <div
-                className={`relative flex-1 overflow-hidden border-r transition-colors duration-500 rounded-l-sm ${getPageStyles()}`}
-            >
+            {/* Spine Shadow - hidden on mobile */}
+            {!isMobile && (
                 <div
-                    className={`pointer-events-none absolute inset-0 z-10 bg-gradient-to-r ${settings.theme === "dark" ? "from-black/40 to-transparent" : "from-black/5 to-transparent"}`}
+                    className={`pointer-events-none absolute bottom-0 left-1/2 top-0 z-30 w-12 -translate-x-1/2 bg-gradient-to-r blur-sm ${getSpineStyles()}`}
                 />
-                {/* Left page shows the even-numbered page of the current spread */}
-                {(() => {
-                    // Calculate left page: if currentPage is odd, left = currentPage - 1 (could be 0)
-                    // if currentPage is even, left = currentPage - 1 (the odd page before it)
-                    const spreadBase = Math.floor((currentPage - 1) / 2) * 2
-                    const leftPage = spreadBase // Even pages on left (0, 2, 4...)
-                    return leftPage > 0 ? getPageContent(leftPage) : (
-                        <div className="flex h-full items-center justify-center">
-                            <span className="text-xs opacity-30">Inside Cover</span>
-                        </div>
-                    )
-                })()}
-            </div>
+            )}
 
-            {/* Right Page */}
+            {/* Left Page - hidden on mobile */}
+            {!isMobile && (
+                <div
+                    className={`relative flex-1 overflow-hidden border-r transition-colors duration-500 rounded-l-sm ${getPageStyles()}`}
+                >
+                    <div
+                        className={`pointer-events-none absolute inset-0 z-10 bg-gradient-to-r ${settings.theme === "dark" ? "from-black/40 to-transparent" : "from-black/5 to-transparent"}`}
+                    />
+                    {/* Left page shows the even-numbered page of the current spread */}
+                    {(() => {
+                        // Calculate left page: if currentPage is odd, left = currentPage - 1 (could be 0)
+                        // if currentPage is even, left = currentPage - 1 (the odd page before it)
+                        const spreadBase = Math.floor((currentPage - 1) / 2) * 2
+                        const leftPage = spreadBase // Even pages on left (0, 2, 4...)
+                        return leftPage > 0 ? getPageContent(leftPage) : (
+                            <div className="flex h-full items-center justify-center">
+                                <span className="text-xs opacity-30">Inside Cover</span>
+                            </div>
+                        )
+                    })()}
+                </div>
+            )}
+
+            {/* Right Page (or single page on mobile) */}
             <div
-                className={`relative flex-1 overflow-hidden border-l transition-colors duration-500 rounded-r-sm ${getPageStyles()}`}
+                className={`relative flex-1 overflow-hidden transition-colors duration-500 ${isMobile ? 'rounded-sm' : 'border-l rounded-r-sm'} ${getPageStyles()}`}
             >
                 <div
                     className={`pointer-events-none absolute inset-0 z-10 bg-gradient-to-l ${settings.theme === "dark" ? "from-black/40 to-transparent" : "from-black/5 to-transparent"}`}
@@ -215,8 +228,11 @@ export function BookSpread({ currentPage, direction, book, settings }: BookSprea
                         className={`absolute inset-0 backface-hidden preserve-3d transition-colors duration-500 ${getPageStyles()}`}
                         style={{ backfaceVisibility: "hidden", transformStyle: "preserve-3d" }}
                     >
-                        {/* Right page shows the odd-numbered page of the current spread */}
+                        {/* Right page shows the odd-numbered page of the current spread, or current page on mobile */}
                         {(() => {
+                            if (isMobile) {
+                                return getPageContent(currentPage)
+                            }
                             const spreadBase = Math.floor((currentPage - 1) / 2) * 2
                             const rightPage = spreadBase + 1 // Odd pages on right (1, 3, 5...)
                             return getPageContent(rightPage)
