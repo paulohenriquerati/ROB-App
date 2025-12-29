@@ -30,6 +30,10 @@ import path from 'path'
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for large files
 
+// Route Segment Config for large file uploads
+export const fetchCache = 'force-no-store'
+export const dynamic = 'force-dynamic'
+
 /**
  * Check FFmpeg availability
  */

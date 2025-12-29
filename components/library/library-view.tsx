@@ -135,82 +135,36 @@ export function LibraryView() {
     const supabase = createClient()
     const isAax = file.name.toLowerCase().endsWith('.aax')
 
-    if (isAax) {
-      // AAX files need server-side conversion
-      // First create a book record with 'uploading' status
-      const { data: newBook, error: insertError } = await supabase.from("books").insert({
-        title: metadata.title || file.name.replace('.aax', ''),
-        author: metadata.author || 'Unknown Author',
-        cover_url: '/placeholder-cover.jpg',
-        user_id: user.id,
-        is_audiobook: true,
-        audio_source_type: 'file',
-        audio_processing_status: 'uploading',
-        audio_original_filename: file.name,
-        total_pages: 0,
-      }).select().single()
+    // Upload audio file directly to Supabase Storage
+    // This works for all audio types including AAX
+    const audioUrl = await uploadAudioFile(file, user.id)
+    if (!audioUrl) throw new Error("Failed to upload audio file")
 
-      if (insertError || !newBook) {
-        throw new Error("Failed to create book record")
-      }
-
-      // Refresh to show the book with 'uploading' status
-      mutate()
-
-      // Send to conversion API
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('bookId', newBook.id)
-
-      try {
-        const response = await fetch('/api/upload/process-aax', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Conversion failed')
-        }
-
-        // Refresh to show updated book
-        mutate()
-      } catch (error) {
-        // Update book status to failed
-        await supabase.from("books").update({
-          audio_processing_status: 'failed',
-        }).eq("id", newBook.id)
-        mutate()
-        throw error
-      }
-    } else {
-      // Regular audio files - direct upload
-      const audioUrl = await uploadAudioFile(file, user.id)
-      if (!audioUrl) throw new Error("Failed to upload audio file")
-
-      // Upload cover if available
-      let coverUrl = '/placeholder-cover.jpg'
-      if (metadata.coverBlob) {
-        const uploadedCover = await uploadAudioCover(metadata.coverBlob, user.id, metadata.title)
-        if (uploadedCover) coverUrl = uploadedCover
-      }
-
-      // Create book record
-      await supabase.from("books").insert({
-        title: metadata.title,
-        author: metadata.author,
-        cover_url: coverUrl,
-        user_id: user.id,
-        is_audiobook: true,
-        audio_source_type: 'file',
-        audio_url: audioUrl,
-        audio_duration: metadata.duration,
-        audio_processing_status: 'ready',
-        total_pages: 0,
-      })
-
-      mutate()
+    // Upload cover if available
+    let coverUrl = '/placeholder.jpg'
+    if (metadata.coverBlob) {
+      const uploadedCover = await uploadAudioCover(metadata.coverBlob, user.id, metadata.title)
+      if (uploadedCover) coverUrl = uploadedCover
     }
+
+    // Create book record
+    // Note: AAX files are stored as-is. For web playback, FFmpeg conversion
+    // would need to happen on a self-hosted server with FFmpeg installed.
+    await supabase.from("books").insert({
+      title: metadata.title || file.name.replace(/\.(aax|mp3|m4b|wav)$/i, ''),
+      author: metadata.author || 'Unknown Author',
+      cover_url: coverUrl,
+      user_id: user.id,
+      is_audiobook: true,
+      audio_source_type: 'file',
+      audio_url: audioUrl,
+      audio_duration: metadata.duration,
+      audio_processing_status: isAax ? 'processing' : 'ready', // AAX needs conversion for playback
+      audio_original_filename: isAax ? file.name : undefined,
+      total_pages: 0,
+    })
+
+    mutate()
   }, [user, mutate])
 
   const handleAddExternalAudio = useCallback(async (
@@ -225,7 +179,7 @@ export function LibraryView() {
     await supabase.from("books").insert({
       title,
       author,
-      cover_url: '/placeholder-cover.jpg',
+      cover_url: '/placeholder.jpg',
       user_id: user.id,
       is_audiobook: true,
       audio_source_type: 'link',

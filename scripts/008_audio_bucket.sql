@@ -11,13 +11,16 @@ VALUES (
   true,  -- Public bucket for easy audio access
   524288000,  -- 500MB max file size (audiobooks are large)
   ARRAY[
-    'audio/mpeg',      -- MP3
-    'audio/mp4',       -- M4A
-    'audio/x-m4b',     -- M4B (Audible format)
-    'audio/x-m4a',     -- M4A variant
-    'audio/wav',       -- WAV
-    'audio/ogg',       -- OGG
-    'audio/webm'       -- WebM audio
+    'audio/mpeg',       -- MP3
+    'audio/mp4',        -- M4A, M4B
+    'audio/x-m4b',      -- M4B (Audiobook)
+    'audio/x-m4a',      -- M4A variant
+    'audio/wav',        -- WAV
+    'audio/ogg',        -- OGG
+    'audio/webm',       -- WebM audio
+    'audio/flac',       -- FLAC
+    'audio/vnd.audible.aax',  -- AAX (Audible)
+    'application/octet-stream' -- Fallback for unknown types
   ]::text[]
 )
 ON CONFLICT (id) DO UPDATE SET

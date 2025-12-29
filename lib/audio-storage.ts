@@ -24,12 +24,26 @@ export async function uploadAudioFile(
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     const filePath = `${userId}/${timestamp}_${sanitizedName}`
 
+    // Determine content type based on file extension
+    const extension = file.name.toLowerCase().split('.').pop()
+    const mimeTypes: Record<string, string> = {
+        'mp3': 'audio/mpeg',
+        'm4a': 'audio/mp4',
+        'm4b': 'audio/mp4',
+        'wav': 'audio/wav',
+        'ogg': 'audio/ogg',
+        'aax': 'audio/vnd.audible.aax',
+        'flac': 'audio/flac',
+    }
+    const contentType = mimeTypes[extension || ''] || file.type || 'audio/mpeg'
+
     try {
         // Upload to Supabase Storage
         const { data, error } = await supabase.storage
             .from(AUDIO_BUCKET)
             .upload(filePath, file, {
                 cacheControl: '3600',
+                contentType,
                 upsert: false,
             })
 

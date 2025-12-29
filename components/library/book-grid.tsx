@@ -76,7 +76,7 @@ export function BookGrid({
       <AnimatePresence mode="popLayout">
         {filteredBooks.map((book, index) => (
           <BookCard
-            key={book.id || `book-${index}-${book.title}`}
+            key={book.id ? `book-${book.id}` : `new-book-${index}-${Date.now()}`}
             book={book}
             index={index}
             onOpen={onOpenBook}
