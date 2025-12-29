@@ -13,6 +13,8 @@ interface BookGridProps {
   onEditBook: (book: any) => void
   onDeleteBook: (book: any) => void
   onTranscribeBook?: (book: any) => void
+  onPlayAudioBook?: (book: any) => void
+  onAttachAudioBook?: (book: any) => void
   onAddBook: () => void
 }
 
@@ -24,6 +26,8 @@ export function BookGrid({
   onEditBook,
   onDeleteBook,
   onTranscribeBook,
+  onPlayAudioBook,
+  onAttachAudioBook,
   onAddBook,
 }: BookGridProps) {
   // Filter and sort books
@@ -72,7 +76,7 @@ export function BookGrid({
       <AnimatePresence mode="popLayout">
         {filteredBooks.map((book, index) => (
           <BookCard
-            key={book.id}
+            key={book.id || `book-${index}-${book.title}`}
             book={book}
             index={index}
             onOpen={onOpenBook}
@@ -80,6 +84,8 @@ export function BookGrid({
             onEdit={onEditBook}
             onDelete={onDeleteBook}
             onTranscribe={onTranscribeBook}
+            onPlayAudio={onPlayAudioBook}
+            onAttachAudio={onAttachAudioBook}
           />
         ))}
       </AnimatePresence>

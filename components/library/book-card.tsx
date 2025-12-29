@@ -8,7 +8,7 @@ import {
   useSpring,
   type Variants,
 } from "framer-motion"
-import { Star, MoreVertical, Sparkles, FileText, Loader2, BookOpen, Bookmark, Share2 } from "lucide-react"
+import { Star, MoreVertical, Sparkles, FileText, Loader2, BookOpen, Bookmark, Share2, Headphones } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,8 @@ interface BookCardProps {
   onEdit: (book: any) => void
   onDelete: (book: any) => void
   onTranscribe?: (book: any) => void
+  onPlayAudio?: (book: any) => void
+  onAttachAudio?: (book: any) => void
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -96,6 +98,8 @@ export function BookCard({
   onEdit,
   onDelete,
   onTranscribe,
+  onPlayAudio,
+  onAttachAudio,
 }: BookCardProps) {
   const [isHovered, setIsHovered] = useState(false)
 
@@ -297,6 +301,14 @@ export function BookCard({
               </div>
             )}
 
+            {/* Audio Processing Badge (AAX Conversion) */}
+            {(book.audio_processing_status === 'uploading' || book.audio_processing_status === 'processing') && (
+              <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-medium text-white shadow-lg">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {book.audio_processing_status === 'uploading' ? 'Uploading...' : 'Optimizing...'}
+              </div>
+            )}
+
             {/* Completed Badge with pop animation */}
             {progress === 100 && (
               <motion.div
@@ -309,13 +321,36 @@ export function BookCard({
               </motion.div>
             )}
 
-            {/* Hover Gradient Overlay */}
+            {/* Hover Gradient Overlay with Play Audio Button */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: isHovered ? 1 : 0 }}
               transition={{ duration: 0.3 }}
-              className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"
             >
+              {/* Play Audio Button - Center (only when not processing) */}
+              {onPlayAudio && (!book.audio_processing_status || book.audio_processing_status === 'ready') && (
+                <motion.button
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{
+                    scale: isHovered ? 1 : 0,
+                    opacity: isHovered ? 1 : 0,
+                  }}
+                  transition={{ type: "spring", ...springConfig.bounce, delay: 0.1 }}
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onPlayAudio(book)
+                  }}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-xl backdrop-blur-sm transition-colors hover:bg-white"
+                  aria-label="Play audiobook"
+                >
+                  <Headphones className="h-6 w-6 text-amber-600" />
+                </motion.button>
+              )}
+
+              {/* Read Label - Bottom */}
               <motion.span
                 initial={{ y: 20, opacity: 0 }}
                 animate={{
@@ -383,6 +418,24 @@ export function BookCard({
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
+                  {/* Attach Audio option */}
+                  {onAttachAudio && !book.audio_url && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onAttachAudio(book)
+                      }}
+                    >
+                      <Headphones className="mr-2 h-4 w-4" />
+                      Attach Audio
+                    </DropdownMenuItem>
+                  )}
+                  {book.audio_url && (
+                    <DropdownMenuItem disabled className="text-green-600 dark:text-green-400">
+                      <Headphones className="mr-2 h-4 w-4" />
+                      Audio Attached
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation()
@@ -426,8 +479,8 @@ export function BookCard({
                 >
                   <Star
                     className={`h-4 w-4 transition-all duration-300 ${star <= book.rating
-                        ? "fill-amber-500 text-amber-500 drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]"
-                        : "fill-transparent text-slate-300 dark:text-zinc-600"
+                      ? "fill-amber-500 text-amber-500 drop-shadow-[0_0_4px_rgba(245,158,11,0.5)]"
+                      : "fill-transparent text-slate-300 dark:text-zinc-600"
                       }`}
                   />
                 </motion.button>

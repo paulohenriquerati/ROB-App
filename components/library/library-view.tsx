@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, LayoutGroup } from "framer-motion"
 import type { Book, LibraryFilter } from "@/lib/types"
 import { LibraryHeader } from "./header"
 import { SearchFilter } from "./search-filter"
@@ -9,14 +9,18 @@ import { BookGrid } from "./book-grid"
 import { BookReader } from "../reader/book-reader"
 import { EditBookModal } from "./edit-book-modal"
 import { AddBookModal } from "./add-book-modal"
+import { AttachAudioModal } from "./attach-audio-modal"
 import { TranscriptionModal } from "./transcription-modal"
 import { StatsDashboard } from "../stats/stats-dashboard"
 import { CommunityFeed } from "../social/community-feed"
+import { AudiobookPlayer, type AudiobookTheme } from "../reader/audiobook-player"
 import { useBooks } from "@/lib/hooks/use-books"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { createClient } from "@/lib/supabase/client"
 import { Loader2 } from "lucide-react"
 import { extractPdfInfo } from "@/lib/pdf-utils"
+import { uploadAudioFile, uploadAudioCover } from "@/lib/audio-storage"
+import type { AudioMetadata } from "@/lib/audio-utils"
 
 const defaultFilter: LibraryFilter = {
   search: "",
@@ -35,6 +39,15 @@ export function LibraryView() {
   const [activeView, setActiveView] = useState<"library" | "stats" | "community">("library")
   const [transcribingBook, setTranscribingBook] = useState<Book | null>(null)
 
+  // Audiobook Player State
+  const [audioBook, setAudioBook] = useState<Book | null>(null)
+  const [isAudioPlayerOpen, setIsAudioPlayerOpen] = useState(false)
+  const [isAudioPlayerMinimized, setIsAudioPlayerMinimized] = useState(false)
+  const [audioPlayerTheme, setAudioPlayerTheme] = useState<AudiobookTheme>("cream")
+
+  // Attach Audio Modal State
+  const [attachAudioBook, setAttachAudioBook] = useState<Book | null>(null)
+
   const handleOpenBook = useCallback((book: Book) => {
     setSelectedBook(book)
   }, [])
@@ -43,6 +56,186 @@ export function LibraryView() {
     setSelectedBook(null)
     mutate() // Refresh books after reading
   }, [mutate])
+
+  // Audiobook Player Handlers
+  const handlePlayAudio = useCallback((book: Book) => {
+    setAudioBook(book)
+    setIsAudioPlayerOpen(true)
+    setIsAudioPlayerMinimized(false)
+  }, [])
+
+  const handleCloseAudioPlayer = useCallback(() => {
+    setIsAudioPlayerOpen(false)
+    setIsAudioPlayerMinimized(false)
+    setAudioBook(null)
+  }, [])
+
+  const handleMinimizeAudioPlayer = useCallback(() => {
+    setIsAudioPlayerMinimized(true)
+  }, [])
+
+  const handleMaximizeAudioPlayer = useCallback(() => {
+    setIsAudioPlayerMinimized(false)
+  }, [])
+
+  // Save audio progress to database
+  const handleSaveAudioProgress = useCallback(async (bookId: string, position: number) => {
+    const supabase = createClient()
+    await supabase.from("books").update({
+      last_played_position: position,
+    }).eq("id", bookId)
+  }, [])
+
+  // Attach Audio Handlers
+  const handleAttachAudio = useCallback((book: Book) => {
+    setAttachAudioBook(book)
+  }, [])
+
+  const handleAttachAudioFile = useCallback(async (
+    book: Book,
+    audioUrl: string,
+    duration: number,
+    coverUrl?: string
+  ) => {
+    const supabase = createClient()
+    const updates: any = {
+      is_audiobook: true,
+      audio_source_type: 'file',
+      audio_url: audioUrl,
+      audio_duration: duration,
+    }
+    if (coverUrl) {
+      updates.cover_url = coverUrl
+    }
+    await supabase.from("books").update(updates).eq("id", book.id)
+    mutate()
+    setAttachAudioBook(null)
+  }, [mutate])
+
+  const handleAttachAudioLink = useCallback(async (
+    book: Book,
+    audioUrl: string,
+    duration: number
+  ) => {
+    const supabase = createClient()
+    await supabase.from("books").update({
+      is_audiobook: true,
+      audio_source_type: 'link',
+      audio_url: audioUrl,
+      audio_duration: duration,
+    }).eq("id", book.id)
+    mutate()
+    setAttachAudioBook(null)
+  }, [mutate])
+
+  // Add Audiobook Handler
+  const handleAddAudiobook = useCallback(async (metadata: AudioMetadata, file: File) => {
+    if (!user) return
+
+    const supabase = createClient()
+    const isAax = file.name.toLowerCase().endsWith('.aax')
+
+    if (isAax) {
+      // AAX files need server-side conversion
+      // First create a book record with 'uploading' status
+      const { data: newBook, error: insertError } = await supabase.from("books").insert({
+        title: metadata.title || file.name.replace('.aax', ''),
+        author: metadata.author || 'Unknown Author',
+        cover_url: '/placeholder-cover.jpg',
+        user_id: user.id,
+        is_audiobook: true,
+        audio_source_type: 'file',
+        audio_processing_status: 'uploading',
+        audio_original_filename: file.name,
+        total_pages: 0,
+      }).select().single()
+
+      if (insertError || !newBook) {
+        throw new Error("Failed to create book record")
+      }
+
+      // Refresh to show the book with 'uploading' status
+      mutate()
+
+      // Send to conversion API
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('bookId', newBook.id)
+
+      try {
+        const response = await fetch('/api/upload/process-aax', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Conversion failed')
+        }
+
+        // Refresh to show updated book
+        mutate()
+      } catch (error) {
+        // Update book status to failed
+        await supabase.from("books").update({
+          audio_processing_status: 'failed',
+        }).eq("id", newBook.id)
+        mutate()
+        throw error
+      }
+    } else {
+      // Regular audio files - direct upload
+      const audioUrl = await uploadAudioFile(file, user.id)
+      if (!audioUrl) throw new Error("Failed to upload audio file")
+
+      // Upload cover if available
+      let coverUrl = '/placeholder-cover.jpg'
+      if (metadata.coverBlob) {
+        const uploadedCover = await uploadAudioCover(metadata.coverBlob, user.id, metadata.title)
+        if (uploadedCover) coverUrl = uploadedCover
+      }
+
+      // Create book record
+      await supabase.from("books").insert({
+        title: metadata.title,
+        author: metadata.author,
+        cover_url: coverUrl,
+        user_id: user.id,
+        is_audiobook: true,
+        audio_source_type: 'file',
+        audio_url: audioUrl,
+        audio_duration: metadata.duration,
+        audio_processing_status: 'ready',
+        total_pages: 0,
+      })
+
+      mutate()
+    }
+  }, [user, mutate])
+
+  const handleAddExternalAudio = useCallback(async (
+    url: string,
+    title: string,
+    author: string,
+    duration: number
+  ) => {
+    if (!user) return
+
+    const supabase = createClient()
+    await supabase.from("books").insert({
+      title,
+      author,
+      cover_url: '/placeholder-cover.jpg',
+      user_id: user.id,
+      is_audiobook: true,
+      audio_source_type: 'link',
+      audio_url: url,
+      audio_duration: duration,
+      total_pages: 0,
+    })
+
+    mutate()
+  }, [user, mutate])
 
   const handleRateBook = useCallback(
     async (book: Book, rating: number) => {
@@ -193,6 +386,8 @@ export function LibraryView() {
                     onEditBook={handleEditBook as any}
                     onDeleteBook={handleDeleteBook as any}
                     onTranscribeBook={handleTranscribeBook as any}
+                    onPlayAudioBook={handlePlayAudio as any}
+                    onAttachAudioBook={handleAttachAudio as any}
                     onAddBook={() => setIsAddBookOpen(true)}
                   />
                 )}
@@ -241,6 +436,8 @@ export function LibraryView() {
             isOpen={isAddBookOpen}
             onClose={() => setIsAddBookOpen(false)}
             onUpload={handleUpload}
+            onAddAudiobook={handleAddAudiobook}
+            onAddExternalAudio={handleAddExternalAudio}
           />
         )}
       </AnimatePresence>
@@ -276,6 +473,42 @@ export function LibraryView() {
           onComplete={handleTranscriptionComplete}
         />
       )}
+
+      {/* Audiobook Player */}
+      <LayoutGroup>
+        <AnimatePresence>
+          {isAudioPlayerOpen && audioBook && (
+            <AudiobookPlayer
+              isOpen={isAudioPlayerOpen}
+              isMinimized={isAudioPlayerMinimized}
+              onClose={handleCloseAudioPlayer}
+              onMinimize={handleMinimizeAudioPlayer}
+              onMaximize={handleMaximizeAudioPlayer}
+              book={{
+                id: audioBook.id,
+                title: audioBook.title,
+                author: audioBook.author,
+                coverUrl: audioBook.cover_url,
+                audioUrl: audioBook.audio_url,
+                duration: audioBook.audio_duration,
+                lastPosition: audioBook.last_played_position,
+              }}
+              theme={audioPlayerTheme}
+              onThemeChange={setAudioPlayerTheme}
+              onProgressSave={handleSaveAudioProgress}
+            />
+          )}
+        </AnimatePresence>
+      </LayoutGroup>
+
+      {/* Attach Audio Modal */}
+      <AttachAudioModal
+        isOpen={!!attachAudioBook}
+        onClose={() => setAttachAudioBook(null)}
+        book={attachAudioBook}
+        onAttachFile={handleAttachAudioFile}
+        onAttachLink={handleAttachAudioLink}
+      />
     </div>
   )
 }

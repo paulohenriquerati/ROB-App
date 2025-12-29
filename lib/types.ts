@@ -15,6 +15,16 @@ export interface Book {
   // Transcription fields
   transcription_status?: 'pending' | 'processing' | 'completed' | 'failed'
   transcription_progress?: number
+  // Audio fields
+  is_audiobook?: boolean
+  audio_source_type?: 'file' | 'link'
+  audio_url?: string
+  audio_duration?: number  // seconds
+  last_played_position?: number  // seconds
+  // Audio processing (AAX conversion)
+  audio_processing_status?: 'uploading' | 'processing' | 'ready' | 'failed'
+  audio_original_filename?: string
+  audio_narrator?: string
 }
 
 export interface BookNote {
