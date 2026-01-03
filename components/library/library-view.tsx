@@ -313,7 +313,12 @@ export function LibraryView() {
 
   return (
     <div className="min-h-screen bg-background">
-      <LibraryHeader activeView={activeView} onViewChange={setActiveView} />
+      <LibraryHeader
+        activeView={activeView}
+        onViewChange={setActiveView}
+        searchQuery={filter.search}
+        onSearch={(query) => setFilter(prev => ({ ...prev, search: query }))}
+      />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
         <AnimatePresence mode="wait">
@@ -327,24 +332,19 @@ export function LibraryView() {
             >
               <SearchFilter filter={filter} onFilterChange={setFilter} totalBooks={books.length} />
               <div className="mt-8">
-                {booksLoading ? (
-                  <div className="flex items-center justify-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <BookGrid
-                    books={formattedBooks as any}
-                    filter={filter as any}
-                    onOpenBook={handleOpenBook as any}
-                    onRateBook={handleRateBook as any}
-                    onEditBook={handleEditBook as any}
-                    onDeleteBook={handleDeleteBook as any}
-                    onTranscribeBook={handleTranscribeBook as any}
-                    onPlayAudioBook={handlePlayAudio as any}
-                    onAttachAudioBook={handleAttachAudio as any}
-                    onAddBook={() => setIsAddBookOpen(true)}
-                  />
-                )}
+                <BookGrid
+                  books={formattedBooks as any}
+                  filter={filter as any}
+                  onOpenBook={handleOpenBook as any}
+                  onRateBook={handleRateBook as any}
+                  onEditBook={handleEditBook as any}
+                  onDeleteBook={handleDeleteBook as any}
+                  onTranscribeBook={handleTranscribeBook as any}
+                  onPlayAudioBook={handlePlayAudio as any}
+                  onAttachAudioBook={handleAttachAudio as any}
+                  onAddBook={() => setIsAddBookOpen(true)}
+                  isLoading={booksLoading}
+                />
               </div>
             </motion.div>
           )}

@@ -304,6 +304,8 @@ export function AddBookModal({
                                                 onDrop={handleDrop}
                                                 onClick={() => fileInputRef.current?.click()}
                                                 icon={FileText}
+                                                customImage="/books4.png"
+                                                imageClassName="ml-4"
                                                 title="Upload PDF"
                                                 subtitle="Drag & drop or click to browse"
                                                 hint="PDF files only (max 50MB)"
@@ -341,6 +343,8 @@ export function AddBookModal({
                                                     onDrop={handleDrop}
                                                     onClick={() => fileInputRef.current?.click()}
                                                     icon={Music}
+                                                    customImage="/audiobook.png"
+                                                    imageClassName="-ml-12"
                                                     title="Upload Audiobook"
                                                     subtitle="Drag & drop MP3, M4B, AAX, or WAV"
                                                     hint="Auto-extracts cover & metadata"
@@ -359,6 +363,8 @@ export function AddBookModal({
                                             )}
                                         </motion.div>
                                     )}
+
+
 
                                     {/* Link Tab */}
                                     {activeTab === "link" && (
@@ -470,19 +476,58 @@ export function AddBookModal({
                                     disabled={isProcessing}
                                 />
 
-                                {/* Footer */}
-                                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400">
-                                    <FileText size={14} />
-                                    <span>Securely stored in your private library</span>
-                                </div>
+                                {/* Security Badge */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3 }}
+                                    className="mt-6 flex items-center justify-center"
+                                >
+                                    <div className="inline-flex items-center gap-2.5 rounded-full border border-black/[0.06] bg-slate-50 px-4 py-2 dark:border-white/[0.06] dark:bg-zinc-800/50">
+                                        {/* 3D Padlock with Lock-Snap Animation */}
+                                        <motion.div
+                                            initial={{ y: -3 }}
+                                            animate={{ y: 0 }}
+                                            transition={{
+                                                type: "spring",
+                                                stiffness: 500,
+                                                damping: 15,
+                                                delay: 0.5
+                                            }}
+                                            className="relative h-6 w-6 flex-shrink-0"
+                                        >
+                                            <img
+                                                src="/padlock.png"
+                                                alt="Secure"
+                                                className="h-full w-full object-contain drop-shadow-sm"
+                                            />
+                                        </motion.div>
+
+                                        {/* Typography */}
+                                        <span
+                                            className="text-sm font-medium tracking-tight text-gray-800 dark:text-gray-200"
+                                            style={{ letterSpacing: '-0.02em' }}
+                                        >
+                                            Securely stored in your{' '}
+                                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                Private Library
+                                            </span>
+                                        </span>
+                                    </div>
+                                </motion.div>
                             </div>
                         </motion.div>
-                    </motion.div>
+                    </motion.div >
                 </>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
@@ -497,6 +542,9 @@ interface DropZoneProps {
     onDrop: (e: React.DragEvent) => void
     onClick: () => void
     icon: React.ComponentType<{ className?: string }>
+    // New prop for 3D asset
+    customImage?: string
+    imageClassName?: string
     title: string
     subtitle: string
     hint: string
@@ -511,62 +559,208 @@ function DropZone({
     onDrop,
     onClick,
     icon: Icon,
+    customImage,
+    imageClassName,
     title,
     subtitle,
     hint,
 }: DropZoneProps) {
+    // Typewriter effect state
+    const [statusText, setStatusText] = useState("Initializing...")
+
+    // Cycle status text during processing
+    useEffect(() => {
+        if (!isProcessing || isSuccess) return
+
+        const messages = ["Uploading...", "Extracting Metadata...", "Polishing Pixels...", "Finalizing..."]
+        let i = 0
+        setStatusText(messages[0])
+
+        const interval = setInterval(() => {
+            i = (i + 1) % messages.length
+            setStatusText(messages[i])
+        }, 800)
+
+        return () => clearInterval(interval)
+    }, [isProcessing, isSuccess])
+
+    // Trigger confetti on success
+    useEffect(() => {
+        if (isSuccess) {
+            // Haptic feedback
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(50)
+            }
+
+            import("canvas-confetti").then((confetti) => {
+                confetti.default({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ["#f59e0b", "#10b981", "#3b82f6"],
+                    disableForReducedMotion: true,
+                    zIndex: 100, // Above modal
+                })
+            })
+        }
+    }, [isSuccess])
+
     return (
-        <div
+        <motion.div
+            layout
             onDragOver={!isProcessing ? onDragOver : undefined}
             onDragLeave={!isProcessing ? onDragLeave : undefined}
             onDrop={!isProcessing ? onDrop : undefined}
             onClick={!isProcessing ? onClick : undefined}
-            className={`group relative flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all duration-300 ${isDragging
-                ? "border-amber-500 bg-amber-50 dark:bg-amber-900/10"
-                : "border-slate-200 hover:border-amber-500/50 hover:bg-slate-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
-                } ${isProcessing || isSuccess ? "pointer-events-none" : ""}`}
+            animate={
+                isDragging
+                    ? { scale: 1.02, borderColor: "#f59e0b", backgroundColor: "rgba(245, 158, 11, 0.05)" }
+                    : { scale: 1, borderColor: "var(--border-color)", backgroundColor: "transparent" }
+            }
+            whileHover={!isProcessing && !isSuccess ? { scale: 1.01, borderColor: "#f59e0b" } : undefined}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className={`group relative flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors duration-300 ${isDragging
+                ? "border-amber-500"
+                : "border-slate-200 dark:border-zinc-800"
+                } ${isProcessing || isSuccess ? "pointer-events-none border-transparent" : ""}`}
+            style={{ "--border-color": isDragging ? "#f59e0b" : "currentColor" } as any}
         >
-            <AnimatePresence mode="wait">
-                {isProcessing ? (
+            <AnimatePresence mode="popLayout">
+                {isProcessing || isSuccess ? (
                     <motion.div
                         key="processing"
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        className="flex flex-col items-center gap-4"
+                        className="flex flex-col items-center gap-6"
                     >
-                        {isSuccess ? (
-                            <div className="rounded-full bg-green-100 p-4 dark:bg-green-900/20">
-                                <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
-                            </div>
-                        ) : (
-                            <Loader2 className="h-10 w-10 animate-spin text-amber-500" />
-                        )}
-                        <div className="text-center">
-                            <p className="font-medium text-slate-900 dark:text-white">
-                                {isSuccess ? "Upload Complete!" : "Processing..."}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {isSuccess ? "Adding to library" : "This may take a moment"}
-                            </p>
+                        {/* Interactive Loader / Success State */}
+                        <div className="relative flex h-20 w-20 items-center justify-center">
+                            <AnimatePresence mode="wait">
+                                {isSuccess ? (
+                                    <motion.div
+                                        key="success"
+                                        initial={{ scale: 0, rotate: -90 }}
+                                        animate={{ scale: 1, rotate: 0 }}
+                                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                        className="flex h-full w-full items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30"
+                                    >
+                                        <Check className="h-10 w-10 font-bold" strokeWidth={3} />
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="loading"
+                                        className="relative h-full w-full"
+                                        exit={{ scale: 0, opacity: 0 }}
+                                    >
+                                        {/* Liquid Gradient Ring */}
+                                        <svg className="h-full w-full animate-spin-slow" viewBox="0 0 100 100">
+                                            <defs>
+                                                <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                    <stop offset="0%" stopColor="#f59e0b" />
+                                                    <stop offset="100%" stopColor="#ea580c" />
+                                                </linearGradient>
+                                            </defs>
+                                            <circle cx="50" cy="50" r="45" stroke="rgba(245,158,11,0.2)" strokeWidth="6" fill="none" />
+                                            <circle
+                                                cx="50" cy="50" r="45"
+                                                stroke="url(#neonGradient)"
+                                                strokeWidth="6"
+                                                fill="none"
+                                                strokeDasharray="283"
+                                                strokeDashoffset="70"
+                                                strokeLinecap="round"
+                                                className="animate-[spin_3s_linear_infinite]"
+                                            />
+                                        </svg>
+                                        {/* Inner Pulse */}
+                                        <motion.div
+                                            animate={{ scale: [0.8, 1, 0.8], opacity: [0.5, 1, 0.5] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                            className="absolute inset-0 m-auto h-12 w-12 rounded-full bg-amber-500/20 blur-md"
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        <div className="text-center h-12">
+                            <AnimatePresence mode="wait">
+                                {isSuccess ? (
+                                    <motion.div
+                                        key="msg-success"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                    >
+                                        <p className="text-lg font-semibold text-green-600 dark:text-green-500">Upload Complete!</p>
+                                        <p className="text-sm text-slate-500">Book added to library</p>
+                                    </motion.div>
+                                ) : (
+                                    <motion.div
+                                        key="msg-processing"
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                    >
+                                        <p className="font-medium text-slate-900 dark:text-white tabular-nums">
+                                            {statusText}
+                                        </p>
+                                        <motion.div
+                                            className="mt-2 h-1 w-24 mx-auto overflow-hidden rounded-full bg-slate-100 dark:bg-zinc-800"
+                                        >
+                                            <motion.div
+                                                initial={{ x: "-100%" }}
+                                                animate={{ x: "100%" }}
+                                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                                className="h-full w-full bg-amber-500"
+                                            />
+                                        </motion.div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </motion.div>
                 ) : (
                     <motion.div
                         key="idle"
-                        initial={{ opacity: 0, scale: 0.8 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
                         className="flex flex-col items-center gap-4"
                     >
-                        <div
-                            className={`rounded-full p-4 transition-colors ${isDragging
-                                ? "bg-amber-100 text-amber-600 dark:bg-amber-900/20"
-                                : "bg-slate-100 text-slate-400 dark:bg-zinc-800"
-                                }`}
-                        >
-                            <Icon className="h-8 w-8" />
-                        </div>
+                        {customImage ? (
+                            // 3D Asset Presentation
+                            <motion.div
+                                animate={isDragging
+                                    ? { scale: 1.1, y: 0 }
+                                    : { scale: 1, y: [0, -4, 0] }
+                                }
+                                transition={isDragging
+                                    ? { type: "spring", stiffness: 300, damping: 15 }
+                                    : { duration: 4, repeat: Infinity, ease: "easeInOut" }
+                                }
+                                className={`relative h-40 w-40 ${imageClassName || ''}`}
+                            >
+                                <img
+                                    src={customImage}
+                                    alt="Upload"
+                                    className="h-full w-full object-contain drop-shadow-xl"
+                                />
+                            </motion.div>
+                        ) : (
+                            // Fallback Icon
+                            <motion.div
+                                animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+                                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                                className={`rounded-full p-4 transition-colors ${isDragging
+                                    ? "bg-amber-100 text-amber-600 dark:bg-amber-900/20"
+                                    : "bg-slate-100 text-slate-400 dark:bg-zinc-800"
+                                    }`}
+                            >
+                                <Icon className="h-8 w-8" />
+                            </motion.div>
+                        )}
+
                         <div className="text-center">
                             <p className="font-medium text-slate-900 dark:text-white">{title}</p>
                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
@@ -575,9 +769,10 @@ function DropZone({
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     )
 }
+
 
 interface AudioPreviewProps {
     metadata: AudioMetadata
@@ -636,26 +831,48 @@ function AudioPreview({
                     variant="outline"
                     className="flex-1"
                     onClick={onCancel}
-                    disabled={isProcessing}
+                    disabled={isProcessing || isSuccess}
                 >
                     Cancel
                 </Button>
                 <Button
-                    className="flex-1"
+                    className={`flex-1 overflow-hidden transition-all ${isSuccess ? "bg-green-600 hover:bg-green-700" : ""}`}
                     onClick={onConfirm}
-                    disabled={isProcessing}
+                    disabled={isProcessing || isSuccess}
                 >
-                    {isProcessing ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {isSuccess ? "Added!" : "Uploading..."}
-                        </>
-                    ) : (
-                        <>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Add Audiobook
-                        </>
-                    )}
+                    <AnimatePresence mode="wait">
+                        {isProcessing ? (
+                            <motion.div
+                                key="uploading"
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="flex items-center"
+                            >
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing...
+                            </motion.div>
+                        ) : isSuccess ? (
+                            <motion.div
+                                key="success"
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="flex items-center"
+                            >
+                                <Check className="mr-2 h-4 w-4" />
+                                Added!
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="default"
+                                initial={{ y: 20, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                className="flex items-center"
+                            >
+                                <Upload className="mr-2 h-4 w-4" />
+                                Add Audiobook
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </Button>
             </div>
         </div>
