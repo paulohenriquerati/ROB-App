@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { BookOpen, Headphones, Share2, Sparkles, MoreVertical, Edit, Trash2 } from "lucide-react"
+import { BookOpen, Headphones, Share2, Sparkles, MoreVertical, Edit, Trash2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -12,6 +12,7 @@ interface BookControlBarProps {
     onEdit: () => void
     onDelete: () => void
     hasAudio: boolean
+    isCompleted?: boolean
 }
 
 export function BookControlBar({
@@ -21,6 +22,7 @@ export function BookControlBar({
     onEdit,
     onDelete,
     hasAudio,
+    isCompleted = false,
 }: BookControlBarProps) {
     return (
         <motion.div
@@ -43,20 +45,23 @@ export function BookControlBar({
             )}
         >
             <div className="flex items-center gap-1 rounded-full border border-white/20 bg-black/40 p-1.5 shadow-xl backdrop-blur-xl">
-                {/* Read Button - 3D Book Icon */}
+                {/* Read/Re-read Button - 3D Book Icon */}
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-full text-white hover:bg-white/20 hover:text-white overflow-visible"
+                    className={cn(
+                        "h-10 w-10 rounded-full text-white hover:bg-white/20 hover:text-white overflow-visible",
+                        isCompleted && "ring-1 ring-emerald-400/50"
+                    )}
                     onClick={(e) => {
                         e.stopPropagation()
                         onOpen()
                     }}
-                    title="Read Book"
+                    title={isCompleted ? "Re-read Book" : "Read Book"}
                 >
                     <img
                         src="/books2.png"
-                        alt="Read"
+                        alt={isCompleted ? "Re-read" : "Read"}
                         className="h-9 w-9 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
                     />
                 </Button>
