@@ -97,10 +97,19 @@ export interface AmbientSound {
   url: string
 }
 
+export type BookCategory =
+  | "all"
+  | "technical"
+  | "philosophy"
+  | "history"
+  | "sci-fi"
+  | "biography"
+
 export interface LibraryFilter {
   search: string
   sortBy: "title" | "rating" | "last_read" | "created_at"
   sortOrder: "asc" | "desc"
+  category: BookCategory
 }
 
 export interface SharedQuote {

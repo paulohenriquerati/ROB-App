@@ -4,9 +4,10 @@ import type React from "react"
 
 import { motion } from "framer-motion"
 import { X } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import type { Book } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { CategoryCombobox } from "./category-combobox"
 
 interface EditBookModalProps {
   book: Book
@@ -14,13 +15,33 @@ interface EditBookModalProps {
   onClose: () => void
 }
 
+// Helper to parse genre string into categories array
+function parseCategories(genre: string | undefined): string[] {
+  if (!genre) return []
+  return genre.split(",").map((s) => s.trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean)
+}
+
+// Helper to convert categories array back to genre string
+function categoriesToGenre(categories: string[]): string {
+  return categories.join(", ")
+}
+
 export function EditBookModal({ book, onSave, onClose }: EditBookModalProps) {
   const [title, setTitle] = useState(book.title)
   const [author, setAuthor] = useState(book.author)
 
+  // Parse existing genre into categories
+  const initialCategories = useMemo(() => parseCategories(book.genre), [book.genre])
+  const [categories, setCategories] = useState<string[]>(initialCategories)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ ...book, title, author })
+    onSave({
+      ...book,
+      title,
+      author,
+      genre: categoriesToGenre(categories),
+    })
   }
 
   return (
@@ -78,6 +99,21 @@ export function EditBookModal({ book, onSave, onClose }: EditBookModalProps) {
               />
             </div>
 
+            {/* Category Assignment */}
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Categories
+              </label>
+              <CategoryCombobox
+                value={categories}
+                onChange={setCategories}
+                placeholder="Add categories..."
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Select existing categories or type to create new ones
+              </p>
+            </div>
+
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
@@ -90,3 +126,4 @@ export function EditBookModal({ book, onSave, onClose }: EditBookModalProps) {
     </motion.div>
   )
 }
+

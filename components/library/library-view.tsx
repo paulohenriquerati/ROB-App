@@ -7,6 +7,7 @@ import { LibraryHeader } from "./header"
 import { SearchFilter } from "./search-filter"
 import { BookGrid } from "./book-grid"
 import { BookReader } from "../reader/book-reader"
+import { BookIntroduction } from "./book-introduction"
 import { EditBookModal } from "./edit-book-modal"
 import { AddBookModal } from "./add-book-modal"
 import { AttachAudioModal } from "./attach-audio-modal"
@@ -26,6 +27,7 @@ const defaultFilter: LibraryFilter = {
   search: "",
   sortBy: "last_read",
   sortOrder: "desc",
+  category: "all",
 }
 
 export function LibraryView() {
@@ -33,6 +35,7 @@ export function LibraryView() {
   const { books, isLoading: booksLoading, mutate } = useBooks()
   const [filter, setFilter] = useState<LibraryFilter>(defaultFilter)
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+  const [introductionBook, setIntroductionBook] = useState<Book | null>(null)
   const [editingBook, setEditingBook] = useState<Book | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
@@ -48,8 +51,22 @@ export function LibraryView() {
   // Attach Audio Modal State
   const [attachAudioBook, setAttachAudioBook] = useState<Book | null>(null)
 
+  // Open introduction page first (instead of reader directly)
   const handleOpenBook = useCallback((book: Book) => {
-    setSelectedBook(book)
+    setIntroductionBook(book)
+  }, [])
+
+  // Start reading from introduction page
+  const handleStartReading = useCallback(() => {
+    if (introductionBook) {
+      setSelectedBook(introductionBook)
+      setIntroductionBook(null)
+    }
+  }, [introductionBook])
+
+  // Close introduction and return to library
+  const handleCloseIntroduction = useCallback(() => {
+    setIntroductionBook(null)
   }, [])
 
   const handleCloseReader = useCallback(() => {
@@ -392,6 +409,18 @@ export function LibraryView() {
             onUpload={handleUpload}
             onAddAudiobook={handleAddAudiobook}
             onAddExternalAudio={handleAddExternalAudio}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Book Introduction Page */}
+      <AnimatePresence>
+        {introductionBook && (
+          <BookIntroduction
+            book={introductionBook}
+            onStartReading={handleStartReading}
+            onClose={handleCloseIntroduction}
+            allBooks={books}
           />
         )}
       </AnimatePresence>

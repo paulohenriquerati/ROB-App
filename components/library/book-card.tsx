@@ -151,6 +151,24 @@ export function BookCard({
             <p className="mt-0.5 text-xs text-white/80 truncate">
               {book.author}
             </p>
+            {/* Category Badges */}
+            {book.genre && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {book.genre.split(",").slice(0, 2).map((cat: string, i: number) => (
+                  <span
+                    key={i}
+                    className="inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+                  >
+                    {cat.trim()}
+                  </span>
+                ))}
+                {book.genre.split(",").length > 2 && (
+                  <span className="inline-block rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                    +{book.genre.split(",").length - 2}
+                  </span>
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
 
