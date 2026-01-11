@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Source_Sans_3, Crimson_Pro } from "next/font/google"
+import { Source_Sans_3, Crimson_Pro, Inter } from "next/font/google"
 import { Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
@@ -8,6 +8,7 @@ import "./globals.css"
 const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-sans" })
 const crimsonPro = Crimson_Pro({ subsets: ["latin"], variable: "--font-crimson-pro" })
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
 export const metadata: Metadata = {
   title: "Biblioteca — Your Professional Digital Library",
@@ -37,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${sourceSans.variable} ${crimsonPro.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${sourceSans.variable} ${crimsonPro.variable} ${geistMono.variable} ${inter.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Analytics />

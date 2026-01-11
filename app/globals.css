@@ -4,7 +4,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Premium library theme - warm neutrals with amber accent */
+/* O'Reilly Brand Colors */
 :root {
+  --oreilly-red: #D30026;
+  --oreilly-red-hover: #B00020;
+  --oreilly-teal: #008F78;
+  --oreilly-gray-light: #E0E0E0;
   --background: oklch(0.98 0.005 60);
   --foreground: oklch(0.15 0.01 60);
   --card: oklch(1 0 0);
@@ -122,6 +127,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -156,6 +162,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -186,24 +193,38 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
 /* Gradient mask for horizontal scroll edges */
 .mask-gradient-x {
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 24px,
-    black calc(100% - 24px),
-    transparent
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    black 24px,
-    black calc(100% - 24px),
-    transparent
-  );
+  mask-image: linear-gradient(to right,
+      transparent,
+      black 24px,
+      black calc(100% - 24px),
+      transparent);
+  -webkit-mask-image: linear-gradient(to right,
+      transparent,
+      black 24px,
+      black calc(100% - 24px),
+      transparent);
+}
+
+/* CRITICAL: Remove browser default focus outline (brown ring) on inputs */
+input:focus,
+input:focus-visible,
+input:focus-within {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Search input specific override */
+input[type="text"]:focus,
+input[type="text"]:focus-visible {
+  outline: 2px solid transparent !important;
+  outline-offset: 0 !important;
 }

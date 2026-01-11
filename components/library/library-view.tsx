@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence, motion, LayoutGroup } from "framer-motion"
 import type { Book, LibraryFilter } from "@/lib/types"
 import { LibraryHeader } from "./header"
@@ -31,6 +32,7 @@ const defaultFilter: LibraryFilter = {
 }
 
 export function LibraryView() {
+  const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
   const { books, isLoading: booksLoading, mutate } = useBooks()
   const [filter, setFilter] = useState<LibraryFilter>(defaultFilter)
@@ -51,10 +53,10 @@ export function LibraryView() {
   // Attach Audio Modal State
   const [attachAudioBook, setAttachAudioBook] = useState<Book | null>(null)
 
-  // Open introduction page first (instead of reader directly)
+  // Navigate to the new O'Reilly-style book details page
   const handleOpenBook = useCallback((book: Book) => {
-    setIntroductionBook(book)
-  }, [])
+    router.push(`/book/${book.id}`)
+  }, [router])
 
   // Start reading from introduction page
   const handleStartReading = useCallback(() => {

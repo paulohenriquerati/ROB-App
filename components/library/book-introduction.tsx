@@ -228,13 +228,13 @@ export function BookIntroduction({
                                 <div className="flex-1 text-center md:text-left">
                                     {/* Category Badge */}
                                     {categories.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-3">
+                                        <div className="flex flex-wrap gap-6 justify-center md:justify-start mb-3">
                                             {categories.slice(0, 2).map((cat, i) => (
                                                 <span
                                                     key={i}
                                                     className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"
                                                 >
-                                                    <Tag className="h-3 w-3" />
+                                                    <Tag className="h-36 w-36" />
                                                     {cat}
                                                 </span>
                                             ))}
@@ -242,7 +242,7 @@ export function BookIntroduction({
                                     )}
 
                                     {/* Title */}
-                                    <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-2">
+                                    <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-6">
                                         {book.title}
                                     </h1>
 
